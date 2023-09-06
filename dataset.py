@@ -57,12 +57,14 @@ class Dataset(torch.utils.data.Dataset):
     def __getitem__(self, idx):
         img_id = self.img_ids[idx]
         
-        img = cv2.imread(os.path.join(self.img_dir, img_id + self.img_ext))
-
+        img = cv2.imread(os.path.join(self.img_dir,img_id + self.img_ext))
+        
         mask = []
         for i in range(self.num_classes):
+            print("letrunglinh", os.path.join(self.mask_dir, str(i),
+                        img_id + self.mask_ext))
             mask.append(cv2.imread(os.path.join(self.mask_dir, str(i),
-                        img_id +"_segmentation"+ self.mask_ext), cv2.IMREAD_GRAYSCALE)[..., None])
+                        img_id + self.mask_ext), cv2.IMREAD_GRAYSCALE)[..., None])
         mask = np.dstack(mask)
 
         if self.transform is not None:

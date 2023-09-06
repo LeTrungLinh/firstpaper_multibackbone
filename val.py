@@ -18,7 +18,7 @@ from utils import AverageMeter
 from albumentations import RandomRotate90,Resize
 import time
 from archs import UNext
-
+from models_custom.unet_mobilevig import UNetMobileVig
 
 def parse_args():
     parser = argparse.ArgumentParser()
@@ -45,27 +45,29 @@ def main():
     cudnn.benchmark = True
 
     print("=> creating model %s" % config['arch'])
-    model = archs.__dict__[config['arch']](config['num_classes'],
-                                           config['input_channels'],
-                                           config['deep_supervision'])
+    # model = archs.__dict__[config['arch']](config['num_classes'],
+    #                                        config['input_channels'],
+    #                                        config['deep_supervision'])
+    model = UNetMobileVig(local_channels=[32, 64, 128, 256], global_channels=512, drop_path=0.1)
 
     model = model.cpu()
 
     # Data loading code
+    config['img_ext'] = '.png'
     img_ids = glob(os.path.join('inputs', "test", 'images', '*' + config['img_ext']))
     val_img_ids = [os.path.splitext(os.path.basename(p))[0] for p in img_ids]
-
+    print("letrunglinh", img_ids)
     # _, val_img_ids = train_test_split(img_ids, test_size=0.2, random_state=41)
 
     model.load_state_dict(torch.load('models/%s/model.pth' %
-                                     config['name']))
+                                     config['name'], map_location='cpu'))
     model.eval()
 
     val_transform = Compose([
         Resize(config['input_h'], config['input_w']),
         transforms.Normalize(),
     ])
-
+    config['dataset'] = "test"
     val_dataset = Dataset(
         img_ids=val_img_ids,
         img_dir=os.path.join('inputs', config['dataset'], 'images'),
@@ -96,7 +98,7 @@ def main():
             model = model.cpu()
             # compute output
             output = model(input)
-            # print(output)
+
 
             iou,dice = iou_score(output, target)
             iou_avg_meter.update(iou, input.size(0))

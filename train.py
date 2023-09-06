@@ -22,7 +22,8 @@ from dataset import Dataset
 from metrics import iou_score
 from utils import AverageMeter, str2bool
 from archs import UNext
-
+from unet import UNet
+from models_custom.unet_mobilevig import UNetMobileVig
 
 ARCH_NAMES = archs.__all__
 LOSS_NAMES = losses.__all__
@@ -108,7 +109,7 @@ def train(config, train_loader, model, criterion, optimizer):
 
     model.train()
 
-    pbar = tqdm(total=len(train_loader))
+    pbar = tqdm(total=len(train_loader), desc='train', leave=True)
     for input, target, _ in train_loader:
         input = input.cpu()
         target = target.cpu()
@@ -219,10 +220,12 @@ def main():
     cudnn.benchmark = True
 
     # create model
-    model = archs.__dict__[config['arch']](config['num_classes'],
-                                           config['input_channels'],
-                                           config['deep_supervision'])
+    # model = archs.__dict__[config['arch']](config['num_classes'],
+    #                                        config['input_channels'],
+    #                                        config['deep_supervision'])
+    model = UNetMobileVig(local_channels=[32, 64, 128, 256], global_channels=512, drop_path=0.1)
 
+    # model = UNet(in_channels=3, out_channels=1)
     model = model.cpu()
 
     params = filter(lambda p: p.requires_grad, model.parameters())
@@ -249,11 +252,13 @@ def main():
         raise NotImplementedError
 
     # Data loading code
-    img_ids = glob(os.path.join('inputs', config['dataset'], 'images', '*' + config['img_ext']))
-    img_ids = [os.path.splitext(os.path.basename(p))[0] for p in img_ids]
+    train_img_ids = glob(os.path.join('inputs', config['dataset'], 'train', 'images', '*' + config['img_ext']))
+    train_img_ids = [os.path.splitext(os.path.basename(p))[0] for p in train_img_ids]
 
-    train_img_ids, val_img_ids = train_test_split(img_ids, test_size=0.2, random_state=41)
-
+    val_img_ids = glob(os.path.join('inputs', config['dataset'], 'val', 'images', '*' + config['img_ext']))
+    val_img_ids = [os.path.splitext(os.path.basename(p))[0] for p in val_img_ids]
+    # train_img_ids, val_img_ids = train_test_split(img_ids, test_size=0.2, random_state=41)
+    
     train_transform = Compose([
         RandomRotate90(),
         Flip(),
@@ -268,16 +273,16 @@ def main():
 
     train_dataset = Dataset(
         img_ids=train_img_ids,
-        img_dir=os.path.join('inputs', config['dataset'], 'images'),
-        mask_dir=os.path.join('inputs', config['dataset'], 'masks'),
+        img_dir=os.path.join('inputs', config['dataset'], 'train','images'),
+        mask_dir=os.path.join('inputs', config['dataset'],'train', 'masks'),
         img_ext=config['img_ext'],
         mask_ext=config['mask_ext'],
         num_classes=config['num_classes'],
         transform=train_transform)
     val_dataset = Dataset(
         img_ids=val_img_ids,
-        img_dir=os.path.join('inputs', config['dataset'], 'images'),
-        mask_dir=os.path.join('inputs', config['dataset'], 'masks'),
+        img_dir=os.path.join('inputs', config['dataset'], 'val','images'),
+        mask_dir=os.path.join('inputs', config['dataset'],'val', 'masks'),
         img_ext=config['img_ext'],
         mask_ext=config['mask_ext'],
         num_classes=config['num_classes'],
@@ -354,3 +359,6 @@ def main():
 
 if __name__ == '__main__':
     main()
+
+
+# python train.py --dataset isic2017  --img_ext .jpg --mask_ext .png --lr 0.0001 --epochs 5 --input_w 256 --input_h 256 --b 8

@@ -295,6 +295,7 @@ class UNext(nn.Module):
         out = out.reshape(B, H, W, -1).permute(0, 3, 1, 2).contiguous()
         t4 = out
 
+
         ### Bottleneck
 
         out ,H,W= self.patch_embed4(out)
@@ -472,3 +473,12 @@ class UNext_S(nn.Module):
 
 
 #EOF
+
+if __name__ == '__main__':
+    import torchsummary
+    # test model with (1, 3, 224, 224) input 
+    img = torch.randn(1, 3, 224, 224)
+    model = UNext(num_classes = 1)
+    torchsummary.summary(model, (3, 224, 224), device='cpu')
+    model.eval()
+    out = model(img)
