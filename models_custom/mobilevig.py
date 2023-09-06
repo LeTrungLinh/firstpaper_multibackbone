@@ -283,7 +283,6 @@ class MobileViG(torch.nn.Module):
             x = self.local_backbone[i](x)
         for i in range(len(self.backbone)):
             x = self.backbone[i](x)
-        print("leturnglinh", x.shape)
         x = self.prediction(x)
             
         if self.distillation:

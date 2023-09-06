@@ -25,20 +25,36 @@ class UNetMobileVig(nn.Module):
         """
         super(UNetMobileVig, self).__init__()
 
+        # dowsampling layers
         self.stem = Stem(input_dim=3, output_dim=local_channels[0])
 
-        self.stage1 = InvertedResidual(dim=local_channels[0], mlp_ratio=4, drop_path=drop_path)
-        self.dow_stage1 = Downsample(local_channels[0], local_channels[1])
+        # self.stage1 = InvertedResidual(dim=local_channels[0], mlp_ratio=4, drop_path=drop_path)
+        # self.dow_stage1 = Downsample(local_channels[0], local_channels[1])
 
-        self.stage2 = InvertedResidual(dim=local_channels[1], mlp_ratio=4, drop_path=drop_path)
-        self.dow_stage2 = Downsample(local_channels[1], local_channels[2])
+        # self.stage2 = InvertedResidual(dim=local_channels[1], mlp_ratio=4, drop_path=drop_path)
+        # self.dow_stage2 = Downsample(local_channels[1], local_channels[2])
 
-        self.stage3 = InvertedResidual(dim=local_channels[2], mlp_ratio=4, drop_path=drop_path)
-        self.dow_stage3 = Downsample(local_channels[2], local_channels[3])
+        # self.stage3 = InvertedResidual(dim=local_channels[2], mlp_ratio=4, drop_path=drop_path)
+        # self.dow_stage3 = Downsample(local_channels[2], local_channels[3])
 
-        self.stage4 = InvertedResidual(dim=local_channels[3], mlp_ratio=4, drop_path=drop_path)
-        self.dow_stage4 = Downsample(local_channels[3], global_channels)
+        # self.stage4 = InvertedResidual(dim=local_channels[3], mlp_ratio=4, drop_path=drop_path)
+        # self.dow_stage4 = Downsample(local_channels[3], global_channels)
 
+        self.downsample_branch = nn.ModuleList([])
+        for i in range(len(local_channels)):
+            if i == len(local_channels) - 1:
+                continue
+            self.downsample_branch.append(nn.Sequential(
+                InvertedResidual(dim=local_channels[i], mlp_ratio=4, drop_path=drop_path),
+                Downsample(local_channels[i], local_channels[i+1])
+            ))
+
+        self.downsample_branch.append(nn.Sequential(
+            InvertedResidual(dim=local_channels[-1], mlp_ratio=4, drop_path=drop_path),
+            Downsample(local_channels[-1], global_channels)
+        ))
+
+        # Bottom neck
         self.bottom_neck = nn.ModuleList([])
         for j in range(2):
             self.bottom_neck += [nn.Sequential(
@@ -47,7 +63,6 @@ class UNetMobileVig(nn.Module):
                                 ]
 
         # Upsamlping layers
-
         self.up_stage4 = UpsampleConv(global_channels, local_channels[3])
         self.up_conv_stage4 = InvertedResidual(dim=local_channels[3], mlp_ratio=4, drop_path=drop_path)
 
@@ -69,20 +84,27 @@ class UNetMobileVig(nn.Module):
     def forward(self, x):
         x = self.stem(x) # 1/2
         
-        out = self.stage1(x) # 1/2
-        out_stage1 = self.dow_stage1(out) # 1/4
+        # out = self.stage1(x) # 1/2
+        # out_stage1 = self.dow_stage1(out) # 1/4
 
-        out = self.stage2(out_stage1) # 1/4
-        out_stage2 = self.dow_stage2(out) # 1/8
+        # out = self.stage2(out_stage1) # 1/4
+        # out_stage2 = self.dow_stage2(out) # 1/8
 
-        out = self.stage3(out_stage2) # 1/8
-        out_stage3 = self.dow_stage3(out) # 1/16
+        # out = self.stage3(out_stage2) # 1/8
+        # out_stage3 = self.dow_stage3(out) # 1/16
 
-        out = self.stage4(out_stage3) # 1/16
-        out_stage4 = self.dow_stage4(out) # 1/32
+        # out = self.stage4(out_stage3) # 1/16
+        # out_stage4 = self.dow_stage4(out) # 1/32
+
+        for i in range(len(self.downsample_branch)):
+            x = self.downsample_branch[i](x)
+        
+
+
+
 
         for i in range(len(self.bottom_neck)):
-            out_bottom_neck = self.bottom_neck[i](out_stage4) # 1/32
+            out_bottom_neck = self.bottom_neck[i](x) # 1/32
 
         
         out = self.up_stage4(out_bottom_neck) # 1/16
@@ -103,7 +125,7 @@ class UNetMobileVig(nn.Module):
 
         out = self.final(out_up_stage0) # 1/1
 
-        return out
+        return x
     
 
 if __name__ == "__main__":
