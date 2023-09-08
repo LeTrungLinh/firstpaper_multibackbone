@@ -19,7 +19,7 @@ from albumentations import RandomRotate90,Resize
 import time
 from archs import UNext
 from models_custom.unet_mobilevig import UNetMobileVig
-from models_custom.visual import visulize_feature
+from models_custom.visual import visulize_feature, SaveOutput
 
 from pytorch_grad_cam import (
     GradCAM, HiResCAM, ScoreCAM, GradCAMPlusPlus,
@@ -81,13 +81,34 @@ def main():
     transform = transforms.ToTensor()
     tensor = transform(img).unsqueeze(0)
 
-    target_layers = [model.final]
+    # target_layers = [model.up_conv_stage4]
    
-    cam = EigenCAM(model, target_layers, use_cuda=False)
-    grayscale_cam = cam(tensor)[0, :, :]
-    cam_image = show_cam_on_image(img, grayscale_cam, use_rgb=True)
-    test = Image.fromarray(cam_image)
-    test.save(f'test.jpg')
+    # cam = EigenCAM(model, target_layers, use_cuda=False)
+    # grayscale_cam = cam(tensor)[0, :, :]
+    # cam_image = show_cam_on_image(img, grayscale_cam, use_rgb=True)
+    # test = Image.fromarray(cam_image)
+    # test.save(f'test.jpg')
+
+
+
+    ##### pytorch hooks #####
+    save_output = SaveOutput()
+    hook_handles = []
+    for layer in model.modules():
+        if isinstance(layer, torch.nn.modules.conv.Conv2d):
+            handle = layer.register_forward_hook(save_output)
+            hook_handles.append(handle)
+   
+    output = model(tensor)
+
+    def module_output_to_numpy(tensor):
+        return tensor.detach().to('cpu').numpy()    
+
+    images = module_output_to_numpy(save_output.outputs[0])
+    print(images.shape)
+    for i in range(len(images[0])):
+        cv2.imwrite(f'./feature_{i}.jpg', deprocess_image(images[0,i]))
+
 
 
 
