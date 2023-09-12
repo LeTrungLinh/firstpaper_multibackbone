@@ -43,7 +43,6 @@ def visulize_feature(img_file , model, target_layers):
         cam.batch_size = 16
 
         grayscale_cam = cam(input_tensor=input_tensor, targets=targets)
-        print("letrunglinh")
         grayscale_cam = grayscale_cam[0, :]
 
         cam_image = show_cam_on_image(rgb_img, grayscale_cam, use_rgb=True)
