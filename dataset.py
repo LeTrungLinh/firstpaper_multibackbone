@@ -57,18 +57,16 @@ class Dataset(torch.utils.data.Dataset):
     def __getitem__(self, idx):
         img_id = self.img_ids[idx]
         
-        img = cv2.imread(os.path.join(self.img_dir,img_id + self.img_ext))
+        img_origin = cv2.imread(os.path.join(self.img_dir,img_id + self.img_ext))
         
         mask = []
         for i in range(self.num_classes):
-            print("letrunglinh", os.path.join(self.mask_dir, str(i),
-                        img_id + self.mask_ext))
             mask.append(cv2.imread(os.path.join(self.mask_dir, str(i),
                         img_id + self.mask_ext), cv2.IMREAD_GRAYSCALE)[..., None])
         mask = np.dstack(mask)
 
         if self.transform is not None:
-            augmented = self.transform(image=img, mask=mask)
+            augmented = self.transform(image=img_origin, mask=mask)
             img = augmented['image']
             mask = augmented['mask']
         
@@ -77,7 +75,7 @@ class Dataset(torch.utils.data.Dataset):
         mask = mask.astype('float32') / 255
         mask = mask.transpose(2, 0, 1)
         
-        return img, mask, {'img_id': img_id}
+        return img, mask, {'img_id': img_id}, img_origin
 
 
 
