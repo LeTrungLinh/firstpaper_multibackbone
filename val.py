@@ -81,7 +81,6 @@ def main():
     import torchvision
     transform = torchvision.transforms.ToTensor()
     tensor = transform(img).unsqueeze(0)
-
     # target_layers = [model.up_conv_stage4]
    
     # cam = EigenCAM(model, target_layers, use_cuda=False)
@@ -144,6 +143,9 @@ def main():
     count = 0
     for c in range(config['num_classes']):
         os.makedirs(os.path.join('outputs', config['name'], str(c)), exist_ok=True)
+
+    target_layers = [model.up_conv_stage4]
+    cam = EigenCAM(model, target_layers, use_cuda=False)
     with torch.no_grad():
         for input, target, meta, img_origin in tqdm(val_loader, total=len(val_loader)):
             input = input.cpu()
@@ -161,6 +163,8 @@ def main():
             output[output>=0.5]=1
             output[output<0.5]=0
 
+            
+
             for i in range(len(output)):
                 for c in range(config['num_classes']):
                     # cv2.imwrite(os.path.join('outputs', config['name'], str(c), meta['img_id'][i] + '.jpg'),
@@ -168,17 +172,25 @@ def main():
 
                     # # concate 3 image into 1
                     # put the text in every image
+                    
+
                     target_img = cv2.cvtColor((target[i, c].cpu().numpy() * 255).astype('uint8'), cv2.COLOR_GRAY2BGR)
                     mask_img = cv2.cvtColor((output[i, c] * 255).astype('uint8'), cv2.COLOR_GRAY2BGR)
-                    img_origin = cv2.resize(img_origin[i].numpy(), (224, 224))
+                    img_origin_resize = cv2.resize(img_origin[i].numpy(), (224, 224))
 
+                    img_origin_visual = np.float32(img_origin_resize) / 255
+                    transform = torchvision.transforms.ToTensor()
+                    tensor = transform(img_origin_visual).unsqueeze(0)
+                    grayscale_cam = cam(tensor)[0, :, :]
+                    cam_image = show_cam_on_image(img_origin_visual, grayscale_cam, use_rgb=True)
+                    cv2.imwrite('./test.jpg', cam_image)
                     # Find contours
-                    contours, hierarchy = cv2.findContours((output[i, c] * 255).astype('uint8'), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-                    img_origin = cv2.drawContours(img_origin, contours, -1, (0, 0, 255), 1)
+                    contours, _ = cv2.findContours((output[i, c] * 255).astype('uint8'), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+                    img_origin_resize = cv2.drawContours(img_origin_resize, contours, -1, (0, 0, 255), 1)
                     
-                    contours1, hierarchy = cv2.findContours((target[i, c].cpu().numpy() * 255).astype('uint8'), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-                    img_origin = cv2.drawContours(img_origin, contours1, -1, (0, 255, 0), 1)
-                    img_concate = cv2.hconcat([img_origin, target_img, mask_img])
+                    contours1, _ = cv2.findContours((target[i, c].cpu().numpy() * 255).astype('uint8'), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+                    img_origin_resize = cv2.drawContours(img_origin_resize, contours1, -1, (0, 255, 0), 1)
+                    img_concate = cv2.hconcat([img_origin_resize, cam_image, target_img, mask_img])
 
                     cv2.imwrite(os.path.join('outputs', config['name'], str(c), meta['img_id'][i] + '_result' + '.jpg'),img_concate)
     print('IoU: %.4f' % iou_avg_meter.avg)
